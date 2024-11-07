@@ -1,0 +1,89 @@
+# Prometheus Installation und Konfiguration
+
+# 1. Prometheus herunterladen und entpacken
+wget https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz
+tar xvfz prometheus-2.45.0.linux-amd64.tar.gz
+
+# 2. Prometheus-Dateien verschieben und eigenen Benutzer anlegen
+sudo useradd --no-create-home --shell /bin/false prometheus
+sudo mkdir /etc/prometheus
+sudo mkdir /var/lib/prometheus
+sudo cp prometheus-2.45.0.linux-amd64/prometheus /usr/local/bin/
+sudo cp prometheus-2.45.0.linux-amd64/promtool /usr/local/bin/
+sudo chown prometheus:prometheus /usr/local/bin/prometheus
+sudo chown prometheus:prometheus /usr/local/bin/promtool
+sudo cp -r prometheus-2.45.0.linux-amd64/consoles /etc/prometheus
+sudo cp -r prometheus-2.45.0.linux-amd64/console_libraries /etc/prometheus
+sudo cp prometheus-2.45.0.linux-amd64/prometheus.yml /etc/prometheus/prometheus.yml
+sudo chown -R prometheus:prometheus /etc/prometheus
+sudo chown -R prometheus:prometheus /var/lib/prometheus
+
+# 3. Prometheus als Systemdienst einrichten
+echo "[Unit]
+Description=Prometheus
+After=network.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/var/lib/prometheus/
+
+[Install]
+WantedBy=multi-user.target" | sudo tee /etc/systemd/system/prometheus.service
+
+# 4. Prometheus-Dienst aktivieren und starten
+sudo systemctl daemon-reload
+sudo systemctl start prometheus
+sudo systemctl enable prometheus
+
+# Grafana Installation und Konfiguration
+
+# 1. Grafana aus dem Repository installieren
+sudo apt-get install -y software-properties-common
+sudo add-apt-repository 'deb https://packages.grafana.com/oss/deb stable main'
+sudo apt update
+sudo apt install grafana -y
+
+# 2. Grafana-Dienst starten und aktivieren
+sudo systemctl start grafana-server
+sudo systemctl enable grafana-server
+
+# Node Exporter Installation und Konfiguration
+
+# 1. Node Exporter herunterladen und installieren
+wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+tar xvfz node_exporter-1.6.1.linux-amd64.tar.gz
+sudo mv node_exporter-1.6.1.linux-amd64/node_exporter /usr/local/bin/
+
+# 2. Node Exporter als Systemdienst einrichten
+echo "[Unit]
+Description=Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+ExecStart=/usr/local/bin/node_exporter
+
+[Install]
+WantedBy=multi-user.target" | sudo tee /etc/systemd/system/node_exporter.service
+
+# 3. Node Exporter-Dienst aktivieren und starten
+sudo systemctl daemon-reload
+sudo systemctl start node_exporter
+sudo systemctl enable node_exporter
+
+# Backup & Restore
+
+# 1. Backup von Prometheus
+sudo systemctl stop prometheus
+sudo tar -czvf /backup/prometheus_backup.tar.gz /var/lib/prometheus
+sudo systemctl start prometheus
+
+# 2. Backup von Grafana
+sudo systemctl stop grafana-server
+sudo cp /var/lib/grafana/grafana.db /backup/grafana_backup.db
+sudo systemctl start grafana-server
